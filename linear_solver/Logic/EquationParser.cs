@@ -17,72 +17,62 @@ namespace LinearSolver
         public static ParsedEquationSystem Parse(string input)
         {
             if (string.IsNullOrWhiteSpace(input))
-                throw new ArgumentException("Input is empty. Please enter equations or a matrix.");
+                throw new ArgumentException("Input is empty. Please enter valid equations.");
 
-            var lines = input.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
-            var variableSet = new HashSet<string>();
-            var equations = new List<Dictionary<string, double>>();
+            var lines = input.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            var allVars = new HashSet<string>();
+            var coeffsList = new List<Dictionary<string, double>>();
             var constants = new List<double>();
 
-            foreach (var rawLine in lines)
+            foreach (string raw in lines)
             {
-                string line = rawLine.Replace(" ", "");
+                string line = raw.Replace(" ", "");
                 if (!line.Contains("="))
-                    throw new ArgumentException($"Missing '=' in equation: {line}");
+                    throw new ArgumentException($"Equation missing '=': {line}");
 
                 var parts = line.Split('=');
-                string lhs = parts[0];
-                string rhs = parts[1];
+                string left = parts[0];
+                if (!double.TryParse(parts[1], out double constant))
+                    throw new ArgumentException($"Invalid constant in equation: {line}");
 
-                double constant = double.Parse(rhs);
-                var coeffs = ParseCoefficients(lhs);
-                foreach (var v in coeffs.Keys)
-                    variableSet.Add(v);
+                var eqDict = new Dictionary<string, double>();
 
-                equations.Add(coeffs);
+                var terms = Regex.Matches(left, @"([+\-]?\d*\.?\d*)([a-zA-Z]+)");
+                foreach (Match t in terms)
+                {
+                    string coeffText = t.Groups[1].Value;
+                    string var = t.Groups[2].Value;
+
+                    double coeff = 1;
+                    if (coeffText == "-") coeff = -1;
+                    else if (coeffText == "+") coeff = 1;
+                    else if (!string.IsNullOrEmpty(coeffText))
+                        coeff = double.Parse(coeffText);
+
+                    if (eqDict.ContainsKey(var)) eqDict[var] += coeff;
+                    else eqDict[var] = coeff;
+
+                    allVars.Add(var);
+                }
+
+                coeffsList.Add(eqDict);
                 constants.Add(constant);
             }
 
-            var variables = variableSet.ToArray();
-            Array.Sort(variables, StringComparer.Ordinal);
-
-            int m = equations.Count;
-            int n = variables.Length;
-            double[,] coeffMatrix = new double[m, n];
+            var variables = allVars.OrderBy(v => v).ToArray();
+            int m = coeffsList.Count, n = variables.Length;
+            double[,] matrix = new double[m, n];
 
             for (int i = 0; i < m; i++)
                 for (int j = 0; j < n; j++)
-                    coeffMatrix[i, j] = equations[i].ContainsKey(variables[j]) ? equations[i][variables[j]] : 0.0;
+                    matrix[i, j] = coeffsList[i].ContainsKey(variables[j]) ? coeffsList[i][variables[j]] : 0.0;
 
             return new ParsedEquationSystem
             {
                 Variables = variables,
-                Coefficients = coeffMatrix,
+                Coefficients = matrix,
                 Constants = constants.ToArray()
             };
-        }
-
-        private static Dictionary<string, double> ParseCoefficients(string expr)
-        {
-            var result = new Dictionary<string, double>();
-            var matches = Regex.Matches(expr, @"([+-]?\d*\.?\d*)([a-zA-Z])");
-
-            foreach (Match m in matches)
-            {
-                string numPart = m.Groups[1].Value;
-                string var = m.Groups[2].Value;
-
-                double coeff = 1;
-                if (numPart == "-") coeff = -1;
-                else if (numPart != "" && numPart != "+") coeff = double.Parse(numPart);
-
-                if (result.ContainsKey(var))
-                    result[var] += coeff;
-                else
-                    result[var] = coeff;
-            }
-
-            return result;
         }
     }
 }
