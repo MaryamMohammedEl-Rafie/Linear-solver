@@ -1,298 +1,167 @@
-﻿using System;
-using System.Windows.Forms;
-using LinearSolver;
-using System.Linq;
+﻿using LinearSolver;
+using System;
 using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
 
 namespace linear_solver
 {
     public partial class MainForm : Form
     {
-        private Panel startPanel;
-        private Button btnMatrix;
-        private Button btnSystem;
-        private Label lblChoose;
-        private string[] _currentVariableNames;
-
+        private string[] _currentVariableNames = null;
 
         public MainForm()
         {
             InitializeComponent();
-            comboAlgorithm.SelectedIndex = 0;
 
-            // --- show selection panel instead of opening matrix mode ---
-            CreateStartPanel();
-        }
+            panelInput.Visible = false;
 
-        private void CreateStartPanel()
-        {
-            startPanel = new Panel
-            {
-                Dock = DockStyle.Fill,
-                BackColor = Color.WhiteSmoke
-            };
+            radioSystem.CheckedChanged += radioSystem_CheckedChanged;
+            radioMatrix.CheckedChanged += radioMatrix_CheckedChanged;
 
-            lblChoose = new Label
-            {
-                Text = "Choose Input Mode",
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(80, 50)
-            };
+            btnSolve.Click += btnSolve_Click;
+            btnConvertSystemToMatrix.Click += btnConvertSystemToMatrix_Click;
+            buttonTranspose.Click += buttonTranspose_Click;
+            buttonInverse.Click += buttonInverse_Click;
 
-            btnMatrix = new Button
-            {
-                Text = "Matrix Input",
-                Size = new Size(150, 40),
-                Location = new Point(80, 110)
-            };
-            btnMatrix.Click += (s, e) => StartMatrixMode();
-
-            btnSystem = new Button
-            {
-                Text = "System Input",
-                Size = new Size(150, 40),
-                Location = new Point(80, 170)
-            };
-            btnSystem.Click += (s, e) => StartSystemMode();
-
-            startPanel.Controls.Add(lblChoose);
-            startPanel.Controls.Add(btnMatrix);
-            startPanel.Controls.Add(btnSystem);
-            this.Controls.Add(startPanel);
-        }
-
-        private void StartMatrixMode()
-        {
-            startPanel.Visible = false;
-            radioMatrix.Checked = true;
-            ToggleInputMode();
-            InitializeMatrixGrid();
-            ConfigureMatrixSizeOnSwitch(isStartup: false);
-        }
-
-        private void StartSystemMode()
-        {
-            startPanel.Visible = false;
-            radioSystem.Checked = true;
-            ToggleInputMode();
-        }
-
-        // everything else below is unchanged from your code
-        // --------------------------------------------------
-        private void SetupMatrixGrid(int rows, int totalColumns)
-        {
-            if (rows <= 0 || totalColumns <= 1)
-                throw new ArgumentException("Rows must be > 0 and total columns must be > 1 (including RHS).");
-
-            dgvMatrix.Columns.Clear();
-
-            for (int c = 0; c < totalColumns; c++)
-            {
-                string header = (c == totalColumns - 1) ? "RHS" : $"x{c + 1}";
-                var col = new DataGridViewTextBoxColumn
-                {
-                    HeaderText = header,
-                    Name = header,
-                    SortMode = DataGridViewColumnSortMode.NotSortable,
-                    AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
-                };
-                dgvMatrix.Columns.Add(col);
-            }
-
-            dgvMatrix.RowCount = rows;
-        }
-
-
-        private void InitializeMatrixGrid()
-        {
-            dgvMatrix.AllowUserToAddRows = true;
-            dgvMatrix.AllowUserToDeleteRows = true;
-            dgvMatrix.ReadOnly = false;
-            dgvMatrix.MultiSelect = false;
-            dgvMatrix.SelectionMode = DataGridViewSelectionMode.CellSelect;
-            dgvMatrix.EditMode = DataGridViewEditMode.EditOnKeystrokeOrF2;
-            dgvMatrix.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgvMatrix.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dgvMatrix.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dgvMatrix.BackgroundColor = Color.White;
-
-            if (dgvMatrix.ColumnCount == 0)
-                SetupMatrixGrid(3, 3);
-        }
-
-        private void radioSystem_CheckedChanged(object sender, EventArgs e)
-        {
-            ToggleInputMode();
+            btnResetAll.Click += btnResetAll_Click;
+            btnResetOutput.Click += btnResetOutput_Click;
         }
 
         private void radioMatrix_CheckedChanged(object sender, EventArgs e)
         {
-            ToggleInputMode();
-            if (radioMatrix.Checked)
-                ConfigureMatrixSizeOnSwitch(isStartup: false);
-        }
+            if (!radioMatrix.Checked) return;
 
-        private void ConfigureMatrixSizeOnSwitch(bool isStartup)
-        {
-            if (radioMatrix.Checked)
+            using (var f = new InputSizeForm())
             {
-                using (var inputForm = new InputSizeForm())
+                if (f.ShowDialog() == DialogResult.OK)
                 {
-                    if (inputForm.ShowDialog() == DialogResult.OK)
-                    {
-                        try
-                        {
-                            int equations = inputForm.Rows;
-                            int variables = inputForm.Columns;
-                            SetupMatrixGrid(equations, variables);
-
-                            MessageBox.Show(
-                                $"Matrix ready.\nEquations (rows): {equations}\nVariables (columns): {variables}",
-                                "Matrix Setup Complete",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show(
-                                "Could not set up matrix size. Using default 3×3.\nError: " + ex.Message,
-                                "Input Error",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Error);
-                            SetupMatrixGrid(3, 3);
-                        }
-                    }
-                    else if (dgvMatrix.ColumnCount == 0)
-                        SetupMatrixGrid(3, 3);
-                }
-            }
-        }
-
-        private void ToggleInputMode()
-        {
-            bool system = radioSystem.Checked;
-
-            // When in System mode → enable system input controls, disable matrix grid
-            txtEquations.Enabled = system;
-            btnConvertSystemToMatrix.Enabled = system;
-
-            // When in Matrix mode → enable grid, disable system input controls
-            dgvMatrix.Enabled = !system;
-            dgvMatrix.ReadOnly = system; // ensures user can't edit in system mode
-
-            // Optional: gray out visually when disabled (nice UX)
-            dgvMatrix.DefaultCellStyle.BackColor = system
-                ? System.Drawing.Color.LightGray
-                : System.Drawing.Color.White;
-
-            // Optional: also disable adding/removing rows in system mode
-            dgvMatrix.AllowUserToAddRows = !system;
-            dgvMatrix.AllowUserToDeleteRows = !system;
-        }
-
-        private void btnConvertSystemToMatrix_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var parsed = SystemInputHandler.ParseSystem(txtEquations.Text);
-                InputMatrixHelpers.FillGridFromMatrix(dgvMatrix, parsed.Coefficients);
-
-                // Save variable names for later use (e.g., when solving)
-                _currentVariableNames = parsed.VariableNames;
-
-                dgvMatrix.ReadOnly = false;
-                dgvMatrix.AllowUserToAddRows = false;
-
-            }
-            catch (ArgumentException ex)
-            {
-                MessageBox.Show(ex.Message, "Input error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Unexpected: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void btnSolve_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                double[,] augmented = InputMatrixHelpers.BuildMatrixFromGrid(dgvMatrix);
-                int varsCount = augmented.GetLength(1) - 1;
-                if (varsCount < 1)
-                    throw new ArgumentException("Matrix must include at least one variable column and one RHS column.");
-
-                string[] variables;
-
-                if (_currentVariableNames != null && _currentVariableNames.Length == varsCount)
-                    variables = _currentVariableNames;
-                else
-                    variables = Enumerable.Range(1, varsCount).Select(i => "x" + i).ToArray();
-
-
-                bool useGaussJordan = (comboAlgorithm.SelectedIndex == 1);
-                Step[] steps = useGaussJordan
-                    ? GaussJordanSolver.SolveWithTextbookSteps(augmented)
-                    : GaussianSolver.SolveWithTextbookSteps(augmented);
-
-                rtbOutput.Clear();
-                foreach (var s in steps)
-                    RtfBuilder.AppendStepToRichTextBox(rtbOutput, s);
-
-                var final = steps.Last().MatrixSnapshot;
-                var analysis = ResultAnalyzer.Analyze(final);
-
-                txtFinalOutput.Clear();
-                if (analysis.HasNoSolution)
-                {
-                    txtFinalOutput.Text = "No solution.\r\n";
-                    txtFinalOutput.AppendText("Reason: inconsistent system.\r\n");
-                }
-                else if (analysis.HasInfiniteSolutions)
-                {
-                    txtFinalOutput.Text = "Infinite solutions.\r\n";
+                    CreateMatrixGrid(f.Rows, f.Cols);
+                    panelInput.Visible = true;
                 }
                 else
                 {
-                    txtFinalOutput.Text = "Unique solution:\r\n";
-                    for (int i = 0; i < analysis.Solution.Length; i++)
-                        txtFinalOutput.AppendText($"{variables[i]} = {analysis.Solution[i]:0.######}\r\n");
+                    radioMatrix.Checked = false;
+                    panelInput.Visible = false;
+                    return;
                 }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void btnResetOutput_Click(object sender, EventArgs e)
+        private void radioSystem_CheckedChanged(object sender, EventArgs e)
         {
-            rtbOutput.Clear();
-            txtFinalOutput.Clear();
+            if (!radioSystem.Checked)
+            {
+                if (!radioMatrix.Checked) panelInput.Visible = false;
+                return;
+            }
+            panelInput.Visible = true;
+        }
+
+        private void CreateMatrixGrid(int rows, int cols)
+        {
+            dgvMatrix.AllowUserToAddRows = false;
+            dgvMatrix.Columns.Clear();
+            for (int i = 0; i < cols; i++)
+                dgvMatrix.Columns.Add($"x{i + 1}", $"x{i + 1}");
+            dgvMatrix.RowCount = rows;
+        }
+
+        private double[,] GetMatrixFromGrid(bool excludeRHS = true)
+        {
+            var rows = dgvMatrix.Rows.Cast<DataGridViewRow>().Where(r => !r.IsNewRow).ToArray();
+            int m = rows.Length;
+            int n = dgvMatrix.ColumnCount;
+
+            if (excludeRHS && dgvMatrix.Columns[n - 1].HeaderText == "RHS")
+                n--;
+
+            var A = new double[m, n];
+            for (int i = 0; i < m; i++)
+                for (int j = 0; j < n; j++)
+                {
+                    if (!double.TryParse(rows[i].Cells[j].Value?.ToString(), out double val))
+                        throw new Exception($"Cell [{i + 1},{j + 1}] must contain a number.");
+                    A[i, j] = val;
+                }
+            return A;
+        }
+
+        private void FillGridFromMatrix(double[,] m)
+        {
+            dgvMatrix.SuspendLayout();
+            dgvMatrix.AllowUserToAddRows = false;
+            dgvMatrix.Columns.Clear();
+
+            int rows = m.GetLength(0);
+            int cols = m.GetLength(1);
+
+            for (int j = 0; j < cols; j++)
+                dgvMatrix.Columns.Add($"x{j + 1}", $"x{j + 1}");
+
+            dgvMatrix.RowCount = rows;
+
+            for (int i = 0; i < rows; i++)
+                for (int j = 0; j < cols; j++)
+                    dgvMatrix[j, i].Value = Math.Round(m[i, j], 6);
+
+            dgvMatrix.ResumeLayout();
+        }
+
+        private void buttonTranspose_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var m = GetMatrixFromGrid();
+                var t = MatrixOperations.Transpose(m);
+                FillGridFromMatrix(t);
+                MessageBox.Show("Transposed.");
+            }
+            catch (Exception ex) { MessageBox.Show(ex.Message); }
+        }
+
+        private void buttonInverse_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var A = GetMatrixFromGrid(excludeRHS: true);
+                var inv = MatrixOperations.Inverse(A);
+                FillGridFromMatrix(inv);
+                MessageBox.Show("Inverse calculated successfully.");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Inverse failed: " + ex.Message);
+            }
         }
 
         private void btnResetAll_Click(object sender, EventArgs e)
         {
+            dgvMatrix.Columns.Clear();
+            dgvMatrix.Rows.Clear();
             txtEquations.Clear();
-            rtbOutput.Clear();
             txtFinalOutput.Clear();
-            _currentVariableNames = null; // reset any variable names from previous input
-
-            if (radioMatrix.Checked)
-            {
-                // Prompt user again for new size
-                ConfigureMatrixSizeOnSwitch(isStartup: false);
-            }
-            else
-            {
-                // System mode: just clear everything
-                dgvMatrix.Columns.Clear();
-                startPanel.Visible = true; // back to selection screen
-            }
+            rtbOutput.Clear();
+            _currentVariableNames = null;
+            panelInput.Visible = false;
+            radioMatrix.Checked = false;
+            radioSystem.Checked = false;
         }
 
+        private void btnResetOutput_Click(object sender, EventArgs e)
+        {
+            txtFinalOutput.Clear();
+            rtbOutput.Clear();
+        }
 
+        private void btnSolve_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("Solver functionality placeholder. Use Gaussian/Gauss-Jordan solver here.");
+        }
+
+        private void btnConvertSystemToMatrix_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show("System-to-matrix conversion placeholder.");
+        }
     }
 }

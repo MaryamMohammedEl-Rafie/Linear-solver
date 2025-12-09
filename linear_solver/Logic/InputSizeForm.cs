@@ -6,99 +6,30 @@ namespace linear_solver
 {
     public class InputSizeForm : Form
     {
-        private Label lblRows;
-        private Label lblColumns;
-        private NumericUpDown nudRows;
-        private NumericUpDown nudCols;
-        private Button btnOk;
-        private Button btnCancel;
+        NumericUpDown numR = new NumericUpDown() { Minimum = 1, Maximum = 50, Value = 3, Location = new Point(20, 30), Width = 60 };
+        NumericUpDown numC = new NumericUpDown() { Minimum = 1, Maximum = 50, Value = 3, Location = new Point(120, 30), Width = 60 };
+        Button ok = new Button() { Text = "OK", Location = new Point(20, 70), DialogResult = DialogResult.OK };
+        Button cancel = new Button() { Text = "Cancel", Location = new Point(110, 70), DialogResult = DialogResult.Cancel };
 
-        public int Rows => (int)nudRows.Value;
-        public int Columns => (int)nudCols.Value;
+        public int Rows => (int)numR.Value;
+        public int Cols => (int)numC.Value;
 
         public InputSizeForm()
         {
-            InitializeComponent();
-        }
+            Text = "Matrix Size";
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            ClientSize = new Size(220, 120);
+            StartPosition = FormStartPosition.CenterParent;
 
-        private void InitializeComponent()
-        {
-            this.Text = "Matrix Size";
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.ClientSize = new Size(320, 150);
-            this.MinimizeBox = false;
-            this.MaximizeBox = false;
-            this.ShowInTaskbar = false;
-
-            lblRows = new Label()
+            Controls.AddRange(new Control[]
             {
-                Text = "Number of equations (rows):",
-                Location = new Point(12, 16),
-                AutoSize = true
-            };
+                new Label() { Text = "Rows:", Location = new Point(20, 10), AutoSize = true },
+                new Label() { Text = "Cols:", Location = new Point(120, 10), AutoSize = true },
+                numR, numC, ok, cancel
+            });
 
-            nudRows = new NumericUpDown()
-            {
-                Minimum = 1,
-                Maximum = 1000,
-                Value = 3,
-                Location = new Point(190, 12),
-                Size = new Size(100, 22)
-            };
-
-            lblColumns = new Label()
-            {
-                Text = "Number of variables (columns):",
-                Location = new Point(12, 54),
-                AutoSize = true
-            };
-
-            nudCols = new NumericUpDown()
-            {
-                Minimum = 1,
-                Maximum = 1000,
-                Value = 3,
-                Location = new Point(190, 50),
-                Size = new Size(100, 22)
-            };
-
-            btnOk = new Button()
-            {
-                Text = "OK",
-                DialogResult = DialogResult.OK,
-                Location = new Point(70, 96),
-                Size = new Size(80, 28)
-            };
-            btnOk.Click += BtnOk_Click;
-
-            btnCancel = new Button()
-            {
-                Text = "Cancel",
-                DialogResult = DialogResult.Cancel,
-                Location = new Point(170, 96),
-                Size = new Size(80, 28)
-            };
-
-            this.Controls.Add(lblRows);
-            this.Controls.Add(nudRows);
-            this.Controls.Add(lblColumns);
-            this.Controls.Add(nudCols);
-            this.Controls.Add(btnOk);
-            this.Controls.Add(btnCancel);
-
-            this.AcceptButton = btnOk;
-            this.CancelButton = btnCancel;
-        }
-
-        private void BtnOk_Click(object sender, EventArgs e)
-        {
-            // Basic validation (redundant because NumericUpDown enforces min/max)
-            if (Rows < 1 || Columns < 1)
-            {
-                MessageBox.Show("Rows and columns must be at least 1.", "Invalid input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                this.DialogResult = DialogResult.None; // keep dialog open
-            }
+            AcceptButton = ok;
+            CancelButton = cancel;
         }
     }
 }
